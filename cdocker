@@ -1,0 +1,26 @@
+#!/usr/bin/env node
+
+var argv = require('yargs')
+	.usage("Run Docker commands on a cluster without Swarm.")
+	.command('node', 'Node related commands', function (yargs) {
+		return yargs
+			.command('add', 'Add a node to the cluster')
+			.command('remove', 'Remove a node from the cluster')
+			.demandCommand(1)
+		;
+	})
+	.command('run', 'Run (start) a command in a new container')
+	.command('start', 'Start one or more stopped containers')
+	.command('stop', 'Stop one or more running containers')
+	.command('kill', 'Kill one or more running containers')
+	.command('rm', 'Remove one or more containers')
+	.command('pull', 'Pull an image or a repository from a registry')
+	.command('rmi', 'Remove one or more images')
+	.command('ps', 'List containers')
+	.demandCommand(1)
+	.help('h')
+    .alias('h', 'help')
+	.argv
+;
+
+console.log(argv);
