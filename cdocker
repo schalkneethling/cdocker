@@ -109,13 +109,19 @@ var argv = require('yargs')
                     spin.on('done', function () {
                         // build a fancy table
                         var table = new Table({
-                            head: ['Node', 'OS', 'CPUs', 'RAM'],
+                            head: ['Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
                             style: {
                                 head: []
                             }
                         });
                         for (var i = 0; i < result.length; i++) {
-                            table.push([result[i].Name, result[i].OSType, result[i].NCPU, pretty(result[i].MemTotal)]);
+                            table.push([result[i].Name,
+                                result[i].OSType+'/'+result[i].Architecture,
+                                result[i].NCPU,
+                                pretty(result[i].MemTotal),
+                                result[i].ContainersRunning,
+                                result[i].ContainersStopped
+                            ]);
                         };
                         console.log(table.toString());
                     });
