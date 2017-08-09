@@ -1,26 +1,109 @@
 #!/usr/bin/env node
 
-var argv = require('yargs')
-	.usage("Run Docker commands on a cluster without Swarm.")
-	.command('node', 'Node related commands', function (yargs) {
-		return yargs
-			.command('add', 'Add a node to the cluster')
-			.command('remove', 'Remove a node from the cluster')
-			.demandCommand(1)
-		;
-	})
-	.command('run', 'Run (start) a command in a new container')
-	.command('start', 'Start one or more stopped containers')
-	.command('stop', 'Stop one or more running containers')
-	.command('kill', 'Kill one or more running containers')
-	.command('rm', 'Remove one or more containers')
-	.command('pull', 'Pull an image or a repository from a registry')
-	.command('rmi', 'Remove one or more images')
-	.command('ps', 'List containers')
-	.demandCommand(1)
-	.help('h')
-    .alias('h', 'help')
-	.argv
-;
+var fs = require('fs');
+var path = require('path');
+var Docker = require('dockerode');
+var pretty = require('prettysize');
+var Multispinner = require('multispinner')
+var rangeParser = require('parse-numeric-range');
 
-console.log(argv);
+var config = {
+    containers: {},
+    nodes: {}
+};
+
+var loadConfig = function () {
+    try {
+        var data = fs.readFileSync('./config.json');
+        config = JSON.parse(data);
+    }
+    catch (err) {
+        logger.warn('Could not load config', err.message);
+    }
+};
+
+var saveConfig = function () {
+    fs.writeFile('./config.json', JSON.stringify(config), function (err) {
+        if (err) {
+            console.log('Error saving configuration', err);
+            return;
+        }
+    });
+};
+
+var parseIP = function (ip) {
+    // split on the dot
+    var octets = ip.split(".");
+    // loop on first, etc, etc, to generate all possibles
+    var ips = [];
+    var first = rangeParser.parse(octets[0]);
+    for (var i = first.length - 1; i >= 0; i--) {
+        var second = rangeParser.parse(octets[1]);
+        for (var j = second.length - 1; j >= 0; j--) {
+            var third = rangeParser.parse(octets[2]);
+            for (var k = third.length - 1; k >= 0; k--) {
+                var fourth = rangeParser.parse(octets[3]);
+                for (var l = fourth.length - 1; l >= 0; l--) {
+                    ips.push(first[i]+"."+second[j]+"."+third[k]+"."+fourth[l]);
+                };
+            };
+        };
+    };
+    return ips;
+};
+
+loadConfig();
+
+var argv = require('yargs')
+    .usage("Run Docker commands on a cluster without Swarm.")
+    .command('node', 'Node related commands', function (yargs) {
+        return yargs
+            .command('add [ip]', 'Add one or more nodes to the cluster', function (yargs) {
+                yargs.option('port', {
+                        describe: 'Port for the Docker Engine API',
+                        default: 2375
+                    })
+                ;
+            }, function (argv) {
+                // parse the ip spec into a list
+                var ips = parseIP(argv.ip);
+                var spin = new Multispinner(ips);
+                for (var i = ips.length - 1; i >= 0; i--) {
+                    //var spinner = ora('Contacting engine on node '+ips[i]).start();
+                    var ip = ips[i];
+                    var newnode = new Docker({host: ip, port: argv.port});
+                    newnode.info(function(err, data) {
+                        if(err) {
+                            console.log(err);
+                            spin.error(ip);
+                        } else {
+                            spin.success(ip);
+                            config.nodes[data.Name] = {
+                                port: argv.port,
+                                ip: argv.ip
+                            };
+                        }
+                    });
+                };
+                spin.on('done', function () {
+                    console.log('All done.');
+                    saveConfig();
+                });
+            })
+            .command('remove [ip]', 'Remove a node from the cluster')
+            .demandCommand(1)
+        ;
+    })
+    .command('run', 'Run a command in a new container')
+    .command('start', 'Start one or more stopped containers')
+    .command('stop', 'Stop one or more running containers')
+    .command('kill', 'Kill one or more running containers')
+    .command('rm', 'Remove one or more containers')
+    .command('pull', 'Pull an image or a repository from a registry')
+    .command('rmi', 'Remove one or more images')
+    .command('ps', 'List containers')
+    .demandCommand(1)
+    .help('h')
+    .alias('h', 'help')
+    .argv
+;
