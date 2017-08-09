@@ -99,8 +99,14 @@ var argv = require('yargs')
                     var promise = deferred();
                     new Docker({host: config.nodes[node].ip, port: config.nodes[node].port}).info(function (err, data) {
                         if (err) {
-                            promise.reject(err);
+                            promise.resolve({
+                                ip: config.nodes[node].ip,
+                                status: 'down',
+                                reason: err
+                            });
                         } else {
+                            data.ip = config.nodes[node].ip;
+                            data.status = 'up';
                             promise.resolve(data);
                         }
                     });
@@ -109,19 +115,28 @@ var argv = require('yargs')
                     spin.on('done', function () {
                         // build a fancy table
                         var table = new Table({
-                            head: ['Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
+                            head: ['IP', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
                             style: {
                                 head: []
                             }
                         });
                         for (var i = 0; i < result.length; i++) {
-                            table.push([result[i].Name,
-                                result[i].OSType+'/'+result[i].Architecture,
-                                result[i].NCPU,
-                                pretty(result[i].MemTotal),
-                                result[i].ContainersRunning,
-                                result[i].ContainersStopped
-                            ]);
+                            if (result[i].status = 'up') {
+                                table.push([
+                                    result[i].ip,
+                                    result[i].Name,
+                                    result[i].OSType+'/'+result[i].Architecture,
+                                    result[i].NCPU,
+                                    pretty(result[i].MemTotal),
+                                    result[i].ContainersRunning,
+                                    result[i].ContainersStopped
+                                ]);
+                            } else {
+                                table.push([
+                                    result[i].ip,
+                                    'down'
+                                ]);
+                            }
                         };
                         console.log(table.toString());
                     });
