@@ -7,7 +7,7 @@ var pretty = require('prettysize');
 var Multispinner = require('multispinner')
 var rangeParser = require('parse-numeric-range');
 var deferred = require('deferred');
-var Table = require('cli-table');
+var Table = require('cli-table2');
 
 var config = {
     containers: {},
@@ -109,10 +109,13 @@ var argv = require('yargs')
                     spin.on('done', function () {
                         // build a fancy table
                         var table = new Table({
-                            head: ['Node', 'OS']
+                            head: ['Node', 'OS', 'CPUs', 'RAM'],
+                            style: {
+                                head: []
+                            }
                         });
                         for (var i = 0; i < result.length; i++) {
-                            table.push([result[i].Name, result[i].OSType])
+                            table.push([result[i].Name, result[i].OSType, result[i].NCPU, pretty(result[i].MemTotal)]);
                         };
                         console.log(table.toString());
                     });
