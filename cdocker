@@ -6,6 +6,8 @@ var Docker = require('dockerode');
 var pretty = require('prettysize');
 var Multispinner = require('multispinner')
 var rangeParser = require('parse-numeric-range');
+var deferred = require('deferred');
+var Table = require('cli-table');
 
 var config = {
     containers: {},
@@ -18,12 +20,12 @@ var loadConfig = function () {
         config = JSON.parse(data);
     }
     catch (err) {
-        logger.warn('Could not load config', err.message);
+        console.log('Warning, could not load config', err.message);
     }
 };
 
 var saveConfig = function () {
-    fs.writeFile('./config.json', JSON.stringify(config), function (err) {
+    fs.writeFile('./config.json', JSON.stringify(config, 3), function (err) {
         if (err) {
             console.log('Error saving configuration', err);
             return;
@@ -67,7 +69,7 @@ var argv = require('yargs')
             }, function (argv) {
                 // parse the ip spec into a list
                 var ips = parseIP(argv.ip);
-                var spin = new Multispinner(ips);
+                var spin = new Multispinner(ips, {color: {incomplete: 'yellow'}});
                 for (var i = ips.length - 1; i >= 0; i--) {
                     //var spinner = ora('Contacting engine on node '+ips[i]).start();
                     var ip = ips[i];
@@ -91,6 +93,32 @@ var argv = require('yargs')
                 });
             })
             .command('remove [ip]', 'Remove a node from the cluster')
+            .command('ls', 'List nodes', function () {}, function (argv) {
+                var spin = new Multispinner({0: 'Getting the latest data...'}, {color: {incomplete: 'yellow'}});
+                deferred.map(Object.keys(config.nodes), function (node) {
+                    var promise = deferred();
+                    new Docker({host: config.nodes[node].ip, port: config.nodes[node].port}).info(function (err, data) {
+                        if (err) {
+                            promise.reject(err);
+                        } else {
+                            promise.resolve(data);
+                        }
+                    });
+                    return promise.promise;
+                })(function (result) {
+                    spin.on('done', function () {
+                        // build a fancy table
+                        var table = new Table({
+                            head: ['Node', 'OS']
+                        });
+                        for (var i = 0; i < result.length; i++) {
+                            table.push([result[i].Name, result[i].OSType])
+                        };
+                        console.log(table.toString());
+                    });
+                    spin.success(0);
+                });
+            })
             .demandCommand(1)
         ;
     })
