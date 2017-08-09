@@ -115,15 +115,16 @@ var argv = require('yargs')
                     spin.on('done', function () {
                         // build a fancy table
                         var table = new Table({
-                            head: ['IP', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
+                            head: ['IP', '', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
                             style: {
                                 head: []
                             }
                         });
                         for (var i = 0; i < result.length; i++) {
-                            if (result[i].status = 'up') {
+                            if (result[i].status == 'up') {
                                 table.push([
                                     result[i].ip,
+                                    result[i].status,
                                     result[i].Name,
                                     result[i].OSType+'/'+result[i].Architecture,
                                     result[i].NCPU,
@@ -134,7 +135,7 @@ var argv = require('yargs')
                             } else {
                                 table.push([
                                     result[i].ip,
-                                    'down'
+                                    result[i].status
                                 ]);
                             }
                         };
