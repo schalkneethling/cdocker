@@ -125,7 +125,51 @@ var argv = require('yargs')
         ;
     })
     .command('run', 'Run a command in a new container', function () {}, function (argv) {
-        console.log(argv);
+        // expand container names
+        if(!argv.name) {
+            console.error("Please specify a container name (or array using brace expansion)");
+            process.exit(1);
+        }
+        var names = expand(argv.name);
+        var containers = [];
+        for (var i = names.length; i--; ) {
+            containers.push({
+                name: names[i],
+                node: 'any'
+            });
+        }
+        // make sure we alway have array for env vars
+        if (!(argv.e instanceof Array)) {
+            argv.e = [argv.e];
+        }
+        // look for and expand constraints
+        for (var i = argv.e.length; i--; ) {
+            var keysplit = argv.e[i].split(":");
+            if (keysplit[0] == 'constraint') {
+                if (keysplit[1].includes("==")) {
+                    var valuesplit = keysplit[1].split("==");
+                    var constraint = valuesplit[0];
+                    var pattern = expand(valuesplit[1]);
+                    var count = 0;
+                    for (var j = containers.length; j--; ) {
+                        containers[j][constraint] = pattern[count];
+                        if (count == pattern.length) {
+                            count = 0;
+                        } else {
+                            count++;
+                        }
+                    }
+                } else {
+                    console.error("This constraint is not supported yet:", envs[i]);
+                    process.exit(1);
+                }
+            }
+        }
+        for (var i = containers.length; i--; ) {
+            var cmdline = process.argv.slice(2).join(" ");
+            cmdline = cmdline.replace(argv.name, containers[i].name);
+            console.log('DOCKER_HOST='+containers[i].node, 'docker', cmdline);
+        }
     })
     .command('start', 'Start one or more stopped containers')
     .command('stop', 'Stop one or more running containers')
