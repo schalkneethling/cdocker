@@ -8,6 +8,8 @@ var Multispinner = require('multispinner')
 var rangeParser = require('parse-numeric-range');
 var deferred = require('deferred');
 var Table = require('cli-table2');
+var minimatch = require('minimatch');
+var expand = require('brace-expansion');
 
 var config = {
     containers: {},
@@ -33,27 +35,6 @@ var saveConfig = function () {
     });
 };
 
-var parseIP = function (ip) {
-    // split on the dot
-    var octets = ip.split(".");
-    // loop on first, etc, etc, to generate all possibles
-    var ips = [];
-    var first = rangeParser.parse(octets[0]);
-    for (var i = first.length - 1; i >= 0; i--) {
-        var second = rangeParser.parse(octets[1]);
-        for (var j = second.length - 1; j >= 0; j--) {
-            var third = rangeParser.parse(octets[2]);
-            for (var k = third.length - 1; k >= 0; k--) {
-                var fourth = rangeParser.parse(octets[3]);
-                for (var l = fourth.length - 1; l >= 0; l--) {
-                    ips.push(first[i]+"."+second[j]+"."+third[k]+"."+fourth[l]);
-                };
-            };
-        };
-    };
-    return ips;
-};
-
 loadConfig();
 
 var argv = require('yargs')
@@ -67,8 +48,8 @@ var argv = require('yargs')
                     })
                 ;
             }, function (argv) {
-                // parse the ip spec into a list
-                var ips = parseIP(argv.ip);
+                // expand ip 
+                var ips = expand(argv.ip);
                 var spin = new Multispinner(ips, {color: {incomplete: 'yellow'}});
                 for (var i = ips.length - 1; i >= 0; i--) {
                     //var spinner = ora('Contacting engine on node '+ips[i]).start();
@@ -147,7 +128,9 @@ var argv = require('yargs')
             .demandCommand(1)
         ;
     })
-    .command('run', 'Run a command in a new container')
+    .command('run', 'Run a command in a new container', function () {}, function (argv) {
+        console.log(argv);
+    })
     .command('start', 'Start one or more stopped containers')
     .command('stop', 'Stop one or more running containers')
     .command('kill', 'Kill one or more running containers')

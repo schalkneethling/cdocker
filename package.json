@@ -9,9 +9,11 @@
   "author": "Joshua Higgins <joshiggins@gmail.com> (http://joshh.info/)",
   "license": "MIT",
   "dependencies": {
+    "brace-expansion": "^1.1.8",
     "cli-table2": "^0.2.0",
     "deferred": "^0.7.8",
     "dockerode": "^2.5.0",
+    "minimatch": "^3.0.4",
     "multispinner": "^0.2.1",
     "parse-numeric-range": "0.0.2",
     "prettysize": "^0.1.0",
