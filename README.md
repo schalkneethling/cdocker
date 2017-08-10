@@ -53,3 +53,5 @@ Of course, you can also use brace expansion here
 ```
 cdocker node add "192.168.0.{11..20}"
 ```
+
+When you add or remove nodes, this list will be stored in the `~/.cdocker.json` file.
