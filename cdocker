@@ -57,14 +57,14 @@ var argv = require('yargs')
                     newnode.info(function(err, data) {
                         if(err) {
                             console.log("Could not add", ip, ":", err.message);
-                            deferred.resolve();
+                            promise.resolve();
                         } else {
                             console.log("Added engine at", ip);
                             config.nodes[data.Name] = {
                                 port: argv.port,
                                 ip: argv.ip
                             };
-                            deferred.resolve();
+                            promise.resolve();
                         }
                     });
                     return promise.promise;
