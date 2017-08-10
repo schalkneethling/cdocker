@@ -4,7 +4,6 @@ var fs = require('fs');
 var path = require('path');
 var Docker = require('dockerode');
 var pretty = require('prettysize');
-var Multispinner = require('multispinner')
 var rangeParser = require('parse-numeric-range');
 var deferred = require('deferred');
 var Table = require('cli-table2');
@@ -48,34 +47,32 @@ var argv = require('yargs')
                     })
                 ;
             }, function (argv) {
-                // expand ip 
-                var ips = expand(argv.ip);
-                var spin = new Multispinner(ips, {color: {incomplete: 'yellow'}});
-                for (var i = ips.length - 1; i >= 0; i--) {
-                    //var spinner = ora('Contacting engine on node '+ips[i]).start();
-                    var ip = ips[i];
+                // the ip specified may specify a range of ips to add (using brace syntax)
+                // and do these in parallel the right way
+                deferred.map(expand(argv.ip), function (ip) {
+                    var promise = deferred();
                     var newnode = new Docker({host: ip, port: argv.port});
                     newnode.info(function(err, data) {
                         if(err) {
-                            console.log(err);
-                            spin.error(ip);
+                            console.log("Could not add", ip, ":", err.message);
+                            deferred.resolve();
                         } else {
-                            spin.success(ip);
+                            console.log("Added engine at", ip);
                             config.nodes[data.Name] = {
                                 port: argv.port,
                                 ip: argv.ip
                             };
+                            deferred.resolve();
                         }
                     });
-                };
-                spin.on('done', function () {
+                    return promise.promise;
+                })(function () {
                     console.log('All done.');
                     saveConfig();
                 });
             })
             .command('remove [ip]', 'Remove a node from the cluster')
             .command('ls', 'List nodes', function () {}, function (argv) {
-                var spin = new Multispinner({0: 'Getting the latest data...'}, {color: {incomplete: 'yellow'}});
                 deferred.map(Object.keys(config.nodes), function (node) {
                     var promise = deferred();
                     new Docker({host: config.nodes[node].ip, port: config.nodes[node].port}).info(function (err, data) {
@@ -93,36 +90,33 @@ var argv = require('yargs')
                     });
                     return promise.promise;
                 })(function (result) {
-                    spin.on('done', function () {
-                        // build a fancy table
-                        var table = new Table({
-                            head: ['IP', '', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
-                            style: {
-                                head: []
-                            }
-                        });
-                        for (var i = 0; i < result.length; i++) {
-                            if (result[i].status == 'up') {
-                                table.push([
-                                    result[i].ip,
-                                    result[i].status,
-                                    result[i].Name,
-                                    result[i].OSType+'/'+result[i].Architecture,
-                                    result[i].NCPU,
-                                    pretty(result[i].MemTotal),
-                                    result[i].ContainersRunning,
-                                    result[i].ContainersStopped
-                                ]);
-                            } else {
-                                table.push([
-                                    result[i].ip,
-                                    result[i].status
-                                ]);
-                            }
-                        };
-                        console.log(table.toString());
+                    // build a fancy table
+                    var table = new Table({
+                        head: ['IP', '', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
+                        style: {
+                            head: []
+                        }
                     });
-                    spin.success(0);
+                    for (var i = 0; i < result.length; i++) {
+                        if (result[i].status == 'up') {
+                            table.push([
+                                result[i].ip,
+                                result[i].status,
+                                result[i].Name,
+                                result[i].OSType+'/'+result[i].Architecture,
+                                result[i].NCPU,
+                                pretty(result[i].MemTotal),
+                                result[i].ContainersRunning,
+                                result[i].ContainersStopped
+                            ]);
+                        } else {
+                            table.push([
+                                result[i].ip,
+                                result[i].status
+                            ]);
+                        }
+                    };
+                    console.log(table.toString());
                 });
             })
             .demandCommand(1)
