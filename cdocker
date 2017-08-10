@@ -38,6 +38,24 @@ var saveConfig = function () {
 
 loadConfig();
 
+var getNodeInfo = function (node) {
+    var promise = deferred();
+    new Docker({host: config.nodes[node].ip, port: config.nodes[node].port}).info(function (err, data) {
+        if (err) {
+            promise.resolve({
+                ip: config.nodes[node].ip,
+                status: 'down',
+                reason: err
+            });
+        } else {
+            data.ip = config.nodes[node].ip;
+            data.status = 'up';
+            promise.resolve(data);
+        }
+    });
+    return promise.promise;
+}
+
 var argv = require('yargs')
     .usage("Run Docker commands on a cluster without Swarm.")
     .command('node', 'Node related commands', function (yargs) {
@@ -75,23 +93,7 @@ var argv = require('yargs')
             })
             .command('remove [ip]', 'Remove a node from the cluster')
             .command('ls', 'List nodes', function () {}, function (argv) {
-                deferred.map(Object.keys(config.nodes), function (node) {
-                    var promise = deferred();
-                    new Docker({host: config.nodes[node].ip, port: config.nodes[node].port}).info(function (err, data) {
-                        if (err) {
-                            promise.resolve({
-                                ip: config.nodes[node].ip,
-                                status: 'down',
-                                reason: err
-                            });
-                        } else {
-                            data.ip = config.nodes[node].ip;
-                            data.status = 'up';
-                            promise.resolve(data);
-                        }
-                    });
-                    return promise.promise;
-                })(function (result) {
+                deferred.map(Object.keys(config.nodes), getNodeInfo)(function (result) {
                     // build a fancy table
                     var table = new Table({
                         head: ['IP', '', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
