@@ -10,6 +10,7 @@ var deferred = require('deferred');
 var Table = require('cli-table2');
 var minimatch = require('minimatch');
 var expand = require('brace-expansion');
+var randomItem = require('random-item');
 
 var config = {
     containers: {},
@@ -52,6 +53,33 @@ var getNodeInfo = function (node) {
             data.status = 'up';
             promise.resolve(data);
         }
+    });
+    return promise.promise;
+}
+
+var getBestOrderNodes = function () {
+    var promise = deferred();
+    // This function will be called when 'any' node is requested
+    // It simply sorts the nodes by number of running containers and takes the lowest
+    // Where many nodes are joint-lowest, we pick a random one
+    deferred.map(Object.keys(config.nodes), getNodeInfo)(function (result) {
+        var running = {};
+        for (var i = result.length; i--; ) {
+            var key = result[i].ContainersRunning;
+            if(!(key in running)) {
+                running[key] = [];
+            }
+            running[key].push(result[i].Name);
+        }
+        // do the sort and produce 1 array
+        var sortedkeys = Object.keys(running).sort(function (a,b) {return a-b}).reverse();
+        var sortednodes = [];
+        for (var i = sortedkeys.length; i--; ) {
+            for (var j = running[sortedkeys[i]].length; j--; ) {
+                sortednodes.push(running[sortedkeys[i]][j]);
+            }
+        }
+        promise.resolve(sortednodes);
     });
     return promise.promise;
 }
@@ -162,16 +190,25 @@ var argv = require('yargs')
                         }
                     }
                 } else {
-                    console.error("This constraint is not supported yet:", envs[i]);
+                    console.error("This constraint is not supported yet:", argv.e[i]);
                     process.exit(1);
                 }
             }
         }
-        for (var i = containers.length; i--; ) {
+        // if 'any' node is specified, we must run them syncronously because there is no
+        // scheduler, and we will recalculate the best node after each container is started
+        // otherwise, we can launch them all in parallel
+        getBestOrderNodes().then(function (nodes) {
+            console.log(nodes);
+        });
+        /*for (var i = containers.length; i--; ) {
             var cmdline = process.argv.slice(2).join(" ");
+            if (containers[i].node == 'any') {
+                
+            }
             cmdline = cmdline.replace(argv.name, containers[i].name);
             console.log('DOCKER_HOST='+containers[i].node, 'docker', cmdline);
-        }
+        }*/
     })
     .command('start', 'Start one or more stopped containers')
     .command('stop', 'Stop one or more running containers')
