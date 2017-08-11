@@ -185,7 +185,11 @@ var argv = require('yargs')
         console.log(constraints);
         console.log(containers);
         getMatchingNodes(constraints).then(function (nodes) {
-            if (nodes.length != containers.length) {
+            if (nodes.length == 0) {
+                console.error("No nodes matched the constraints specified.")
+                process.exit(1);
+            }
+            else if (nodes.length != containers.length) {
                 if (!overprovision) {
                     console.error("Not enough nodes matched (", nodes.length,
                     ") for the specified container array (", containers.length,
