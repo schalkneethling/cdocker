@@ -56,7 +56,7 @@ var getNodeInfo = function (node) {
         }
     });
     return promise.promise;
-}
+};
 
 var parseEnv = function (argv) {
     // make sure we alway have array for env vars
@@ -74,7 +74,7 @@ var parseEnv = function (argv) {
         }
     }
     return constraints;
-}
+};
 
 var getMatchingContainers = function (node, constraint) {
     var promise = deferred();
@@ -104,7 +104,7 @@ var getMatchingContainers = function (node, constraint) {
         promise.resolve([node, matchedcontainers]);
     });
     return promise.promise;
-}
+};
 
 var getMatchingNodes = function (nodenames, constraint) {
     // nodes are matched based on name and labels in the config.json
@@ -165,7 +165,54 @@ var getMatchingNodes = function (nodenames, constraint) {
         }
     };
     return matchednodes;
-}
+};
+
+var callContainerFunction = function (argv, func) {
+    var nodes = Object.keys(config.nodes);
+    // see if there is a node constraint
+    var pattern = argv["_"][1].split('/');
+    if (pattern.length > 1) {
+        nodes = getMatchingNodes(nodes, "node=="+pattern[0]);
+        var cpattern = pattern[1];
+    } else {
+        var cpattern = pattern[0];
+    }
+    // see if there is any classic constraints
+    var constraints = parseEnv(argv);
+    for (var i = constraints.length - 1; i >= 0; i--) {
+        nodes = getMatchingNodes(nodes, constraints[i])
+    };
+    // do each node in parallel
+    deferred.map(nodes, function (node) {
+        return getMatchingContainers(node, cpattern);
+    })(function (result) {
+        for (var i = result.length - 1; i >= 0; i--) {
+            var node = result[i][0];
+            var dockerclient = new Docker({host: config.nodes[node].ip, port: config.nodes[node].port});
+            (function (dockerclient, node) {
+                // dispatch the removes in parallel on each node
+                deferred.map(result[i][1], function (cid) {
+                    var promise = deferred();
+                    var funccb = function (err, data) {
+                        if (err) {
+                            promise.resolve(err.message);
+                        } else {
+                            promise.resolve(cid);
+                        }
+                    };
+                    if (func == 'rm') {
+                        dockerclient.getContainer(cid).remove(funccb);
+                    }
+                    return promise.promise;
+                })(function (rmresult) {
+                    for (var i = rmresult.length - 1; i >= 0; i--) {
+                        console.log(node, ':', rmresult[i]);
+                    };
+                });
+            })(dockerclient, node);
+        };
+    });
+};
 
 var argv = require('yargs')
     .usage("Run Docker commands on a cluster without Swarm.")
@@ -316,45 +363,7 @@ var argv = require('yargs')
             return yargs
                 .usage('cdocker rm <node pattern>/<name pattern>');
         }, function (argv) {
-            var nodes = Object.keys(config.nodes);
-            // see if there is a node constraint
-            var pattern = argv["_"][1].split('/');
-            if (pattern.length > 1) {
-                nodes = getMatchingNodes(nodes, "node=="+pattern[0]);
-                var cpattern = pattern[1];
-            } else {
-                var cpattern = pattern[0];
-            }
-            // see if there is any classic constraints
-            var constraints = parseEnv(argv);
-            for (var i = constraints.length - 1; i >= 0; i--) {
-                nodes = getMatchingNodes(nodes, constraints[i])
-            };
-            // do each node in parallel
-            deferred.map(nodes, function (node) {
-                return getMatchingContainers(node, cpattern);
-            })(function (result) {
-                for (var i = result.length - 1; i >= 0; i--) {
-                    var node = result[i][0];
-                    var dockerclient = new Docker({host: config.nodes[node].ip, port: config.nodes[node].port});
-                    // dispatch the removes in parallel on each node
-                    deferred.map(result[i][1], function (cid) {
-                        var promise = deferred();
-                        dockerclient.getContainer(cid).remove(function (err, data) {
-                            if (err) {
-                                promise.resolve(err.message);
-                            } else {
-                                promise.resolve(cid);
-                            }
-                        });
-                        return promise.promise;
-                    })(function (rmresult) {
-                        for (var i = rmresult.length - 1; i >= 0; i--) {
-                            console.log(node, ':', rmresult[i]);
-                        };
-                    });
-                };
-            });
+            callContainerFunction(argv, 'rm');
         })
     .command('pull', 'Pull an image or a repository from a registry')
     .command('rmi', 'Remove one or more images')
