@@ -66,15 +66,29 @@ var getMatchingNodes = function (constraint) {
         if (constraint.includes("==")) {
             var csplit = constraint.split("==");
             if (csplit[0] == "node") {
-                // node to do
-                matched = false
+                // node
+                if (csplit[1].includes("*")) {
+                    // glob
+                    console.error("This constraint is not supported yet:", constraint);
+                    process.exit(1);
+                } else {
+                    // expand
+                    var match_names = expand(csplit[1]);
+                    if (!match_names.includes(node)) {
+                        matched = false;
+                    }
+                }
             } else {
                 // label to do
-                matched = false;
+                console.error("This constraint is not supported yet:", constraint);
+                process.exit(1);
             }
         } else {
             console.error("This constraint is not supported yet:", constraint);
             process.exit(1);
+        }
+        if (matched) {
+            matchednodes.push(node);
         }
     }
     return matchednodes;
