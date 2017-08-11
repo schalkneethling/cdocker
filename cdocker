@@ -29,7 +29,7 @@ var loadConfig = function () {
 };
 
 var saveConfig = function () {
-    fs.writeFile(configfile, JSON.stringify(config, 3), function (err) {
+    fs.writeFile(configfile, JSON.stringify(config, null, 10), function (err) {
         if (err) {
             console.log('Error saving configuration', err);
             return;
@@ -76,6 +76,7 @@ var testConstraint = function (node, constraint) {
 
 var getMatchingNodes = function (constraints) {
     var promise = deferred();
+    // nodes are matched based on name and labels in the config.json
     promise.resolve([]);
     return promise.promise;
 }
