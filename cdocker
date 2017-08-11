@@ -210,7 +210,10 @@ var argv = require('yargs')
         }
         // if 'any' node is specified, we must select some nodes and possibly re use some
         getBestOrderNodes().then(function (nodes) {
-            console.log(nodes);
+            var needed_nodes = 0;
+            for (var i = containers.length; i--; ) {
+                containers[i];
+            }
         });
         /*for (var i = containers.length; i--; ) {
             var cmdline = process.argv.slice(2).join(" ");
