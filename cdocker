@@ -80,9 +80,32 @@ var getMatchingNodes = function (nodenames, constraint) {
                     }
                 }
             } else {
-                // label to do
-                console.error("This constraint is not supported yet:", constraint);
-                process.exit(1);
+                // label
+                if (config.nodes[nodenames[i]].labels) {
+                    for (var j = config.nodes[nodenames[i]].labels.length - 1; j >= 0; j--) {
+                        var lsplit = config.nodes[nodenames[i]].labels[j].split("=");
+                        // if key matches
+                        if (csplit[0] == lsplit[0]) {
+                            // test value
+                            if (csplit[1].includes("*")) {
+                                // glob
+                                if (!minimatch(lsplit[1], csplit[1])) {
+                                    matched = false;
+                                }
+                            } else {
+                                // expand
+                                var match_values = expand(csplit[1]);
+                                if (!match_values.includes(lsplit[1])) {
+                                    matched = false;
+                                }
+                            }
+                        } else {
+                            matched = false;
+                        }
+                    };
+                } else {
+                    matched = false;
+                }
             }
         } else {
             console.error("This constraint is not supported yet:", constraint);
@@ -199,7 +222,7 @@ var argv = require('yargs')
         console.log(constraints);
         console.log(containers);
         for (var i = constraints.length - 1; i >= 0; i--) {
-            console.log(getMatchingNodes(Object.keys(config.nodes), constraints[i]));
+            console.log(constraints[i], 'matches', getMatchingNodes(Object.keys(config.nodes), constraints[i]));
         };
         /*var nodes = getMatchingNodes(constraints);
         if (nodes.length == 0) {
