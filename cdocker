@@ -76,39 +76,7 @@ var testConstraint = function (node, constraint) {
 
 var getMatchingNodes = function (constraints) {
     var promise = deferred();
-    // get info from all nodes
-    deferred.map(Object.keys(config.nodes), getNodeInfo)(function (result) {
-        var running = {};
-        for (var i = result.length; i--; ) {
-            var key = result[i].ContainersRunning;
-            if(!(key in running)) {
-                running[key] = [];
-            }
-            running[key].push(result[i].Name);
-        }
-        // do the sort and produce 1 array
-        var sortedkeys = Object.keys(running).sort(function (a,b) {return a-b}).reverse();
-        var sortednodes = [];
-        for (var i = sortedkeys.length; i--; ) {
-            for (var j = running[sortedkeys[i]].length; j--; ) {
-                sortednodes.push(running[sortedkeys[i]][j]);
-            }
-        }
-        // test each node against constraints and remove from list if not matched
-        var matchednodes = [];
-        for (var i = sortednodes.length; i--; ) {
-            var matched = true;
-            for (var j = constraints.length; j--; ) {
-                if (!testConstraint(sortednodes[i], constraints[j])) {
-                    matched = false;
-                }
-            };
-            if(matched) {
-                matchednodes.push(sortednodes[i]);
-            }
-        }
-        promise.resolve(matchednodes);
-    });
+    promise.resolve([]);
     return promise.promise;
 }
 
@@ -136,7 +104,8 @@ var argv = require('yargs')
                             console.log("Added engine at", ip);
                             config.nodes[data.Name] = {
                                 port: argv.port,
-                                ip: argv.ip
+                                ip: argv.ip,
+                                labels: data.Labels
                             };
                             promise.resolve();
                         }
@@ -152,7 +121,7 @@ var argv = require('yargs')
                 deferred.map(Object.keys(config.nodes), getNodeInfo)(function (result) {
                     // build a fancy table
                     var table = new Table({
-                        head: ['IP', '', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped'],
+                        head: ['IP', '', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped', 'Labels'],
                         style: {
                             head: []
                         }
@@ -167,7 +136,8 @@ var argv = require('yargs')
                                 result[i].NCPU,
                                 pretty(result[i].MemTotal),
                                 result[i].ContainersRunning,
-                                result[i].ContainersStopped
+                                result[i].ContainersStopped,
+                                JSON.stringify(result[i].Labels)
                             ]);
                         } else {
                             table.push([
