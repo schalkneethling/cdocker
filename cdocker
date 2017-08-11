@@ -155,6 +155,7 @@ var argv = require('yargs')
         ;
     })
     .command('run', 'Run a command in a new container', function () {}, function (argv) {
+        var overprovision = false;
         // expand container names
         if(!argv.name) {
             console.error("Please specify a container name (or array using brace expansion)");
@@ -181,23 +182,33 @@ var argv = require('yargs')
                     var constraint = valuesplit[0];
                     var pattern = expand(valuesplit[1]);
                     var count = 0;
-                    for (var j = containers.length; j--; ) {
-                        containers[j][constraint] = pattern[count];
-                        if (count == pattern.length) {
-                            count = 0;
+                    if (containers.length != pattern.length) {
+                        if (overprovision) {
+                            for (var j = containers.length; j--; ) {
+                                containers[j][constraint] = pattern[count];
+                                if (count == pattern.length) {
+                                    count = 0;
+                                } else {
+                                    count++;
+                                }
+                            }
                         } else {
-                            count++;
+                            console.error("The expansion for constraint [", keysplit[1], 
+                                '] length', pattern.length, 
+                                'does not match container array length', 
+                                containers.length, 
+                                'and over provisioning is disabled.');
+                            process.exit(1);
                         }
                     }
+                    
                 } else {
                     console.error("This constraint is not supported yet:", argv.e[i]);
                     process.exit(1);
                 }
             }
         }
-        // if 'any' node is specified, we must run them syncronously because there is no
-        // scheduler, and we will recalculate the best node after each container is started
-        // otherwise, we can launch them all in parallel
+        // if 'any' node is specified, we must select some nodes and possibly re use some
         getBestOrderNodes().then(function (nodes) {
             console.log(nodes);
         });
