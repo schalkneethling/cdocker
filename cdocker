@@ -57,28 +57,27 @@ var getNodeInfo = function (node) {
     return promise.promise;
 }
 
-var testConstraint = function (node, constraint) {
-    // parse a string like 
-    // node==node{1..10}
-    // node==node*
-    // node==exactnode
-    // and return true or false given a node name
-    var matched = false;
-    if (constraint.includes("==")) {
-
-    } else {
-        console.error("This constraint is not supported yet:", constraint);
-        process.exit(1);
-    }
-    //console.log("check constraint", node);
-    return matched;
-}
-
-var getMatchingNodes = function (constraints) {
-    var promise = deferred();
+var getMatchingNodes = function (constraint) {
     // nodes are matched based on name and labels in the config.json
-    promise.resolve([]);
-    return promise.promise;
+    var matchednodes = [];
+    for (var node in config.nodes) {
+        // test the constraint against this node
+        var matched = true;
+        if (constraint.includes("==")) {
+            var csplit = constraint.split("==");
+            if (csplit[0] == "node") {
+                // node to do
+                matched = false
+            } else {
+                // label to do
+                matched = false;
+            }
+        } else {
+            console.error("This constraint is not supported yet:", constraint);
+            process.exit(1);
+        }
+    }
+    return matchednodes;
 }
 
 var argv = require('yargs')
@@ -184,21 +183,23 @@ var argv = require('yargs')
         }
         console.log(constraints);
         console.log(containers);
-        getMatchingNodes(constraints).then(function (nodes) {
-            if (nodes.length == 0) {
-                console.error("No nodes matched the constraints specified.")
+        for (var i = constraints.length - 1; i >= 0; i--) {
+            console.log(getMatchingNodes(constraints[i]));
+        };
+        /*var nodes = getMatchingNodes(constraints);
+        if (nodes.length == 0) {
+            console.error("No nodes matched the constraints specified.")
+            process.exit(1);
+        }
+        else if (nodes.length != containers.length) {
+            if (!overprovision) {
+                console.error("Not enough nodes matched (", nodes.length,
+                ") for the specified container array (", containers.length,
+                ") and overprovision is not enabled.");
                 process.exit(1);
             }
-            else if (nodes.length != containers.length) {
-                if (!overprovision) {
-                    console.error("Not enough nodes matched (", nodes.length,
-                    ") for the specified container array (", containers.length,
-                    ") and overprovision is not enabled.");
-                    process.exit(1);
-                }
-            }
-            console.log(nodes);
-        });
+        }
+        console.log(nodes);*/
         /*for (var i = containers.length; i--; ) {
             var cmdline = process.argv.slice(2).join(" ");
             if (containers[i].node == 'any') {
