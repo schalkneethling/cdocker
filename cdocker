@@ -69,8 +69,9 @@ var getMatchingNodes = function (nodenames, constraint) {
                 // node
                 if (csplit[1].includes("*")) {
                     // glob
-                    console.error("This constraint is not supported yet:", constraint);
-                    process.exit(1);
+                    if (!minimatch(nodenames[i], csplit[1])) {
+                        matched = false;
+                    }
                 } else {
                     // expand
                     var match_names = expand(csplit[1]);
