@@ -248,7 +248,12 @@ var argv = require('yargs')
             console.error("Too many nodes matched (", nodes.length, ") for the specified container array (", containers.length, ").");
             process.exit(1);
         }
-        console.log(containers);
+        // generate the docker commands
+        for (var i = containers.length - 1; i >= 0; i--) {
+            var cmdline = 'DOCKER_HOST='+config.nodes[containers[i].node].ip+ ':'+config.nodes[containers[i].node].port+' docker ';
+            cmdline += process.argv.slice(2).join(' ').replace(argv.name, containers[i].name);
+            console.log(cmdline);
+        };
     })
     .command('start', 'Start one or more stopped containers')
     .command('stop', 'Stop one or more running containers')
