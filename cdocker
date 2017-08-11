@@ -57,10 +57,10 @@ var getNodeInfo = function (node) {
     return promise.promise;
 }
 
-var getMatchingNodes = function (constraint) {
+var getMatchingNodes = function (nodenames, constraint) {
     // nodes are matched based on name and labels in the config.json
     var matchednodes = [];
-    for (var node in config.nodes) {
+    for (var i = nodenames.length - 1; i >= 0; i--) {
         // test the constraint against this node
         var matched = true;
         if (constraint.includes("==")) {
@@ -74,7 +74,7 @@ var getMatchingNodes = function (constraint) {
                 } else {
                     // expand
                     var match_names = expand(csplit[1]);
-                    if (!match_names.includes(node)) {
+                    if (!match_names.includes(nodenames[i])) {
                         matched = false;
                     }
                 }
@@ -88,9 +88,9 @@ var getMatchingNodes = function (constraint) {
             process.exit(1);
         }
         if (matched) {
-            matchednodes.push(node);
+            matchednodes.push(nodenames[i]);
         }
-    }
+    };
     return matchednodes;
 }
 
@@ -198,7 +198,7 @@ var argv = require('yargs')
         console.log(constraints);
         console.log(containers);
         for (var i = constraints.length - 1; i >= 0; i--) {
-            console.log(getMatchingNodes(constraints[i]));
+            console.log(getMatchingNodes(Object.keys(config.nodes), constraints[i]));
         };
         /*var nodes = getMatchingNodes(constraints);
         if (nodes.length == 0) {
