@@ -58,6 +58,24 @@ var getNodeInfo = function (node) {
     return promise.promise;
 }
 
+var parseEnv = function (argv) {
+    // make sure we alway have array for env vars
+    var constraints = [];
+    if (argv.e) {
+        if (!(argv.e instanceof Array)) {
+            argv.e = [argv.e];
+        }
+        // look for constraints
+        for (var i = argv.e.length; i--; ) {
+            var keysplit = argv.e[i].split(":");
+            if (keysplit[0] == 'constraint') {
+                constraints.push(keysplit[1]);
+            }
+        }
+    }
+    return constraints;
+}
+
 var getMatchingNodes = function (nodenames, constraint) {
     // nodes are matched based on name and labels in the config.json
     var matchednodes = [];
@@ -200,7 +218,6 @@ var argv = require('yargs')
         }
         var names = expand(argv.name);
         var containers = [];
-        var constraints = [];
         for (var i = names.length; i--; ) {
             containers.push({
                 name: names[i],
@@ -208,18 +225,7 @@ var argv = require('yargs')
             });
         }
         // make sure we alway have array for env vars
-        if (argv.e) {
-            if (!(argv.e instanceof Array)) {
-                argv.e = [argv.e];
-            }
-            // look for constraints
-            for (var i = argv.e.length; i--; ) {
-                var keysplit = argv.e[i].split(":");
-                if (keysplit[0] == 'constraint') {
-                    constraints.push(keysplit[1]);
-                }
-            }
-        }
+        var constraints = parseEnv(argv);
         // run each constraint sequentially to whittle down the nodes
         var nodes = Object.keys(config.nodes);
         for (var i = constraints.length - 1; i >= 0; i--) {
@@ -276,7 +282,52 @@ var argv = require('yargs')
     .command('start', 'Start one or more stopped containers')
     .command('stop', 'Stop one or more running containers')
     .command('kill', 'Kill one or more running containers')
-    .command('rm', 'Remove one or more containers')
+    .command('rm', 'Remove one or more containers', function (yargs) {
+            return yargs
+                .usage('cdocker rm <node pattern>/<name pattern>');
+        }, function (argv) {
+            var nodes = Object.keys(config.nodes);
+            // see if there is a node constraint
+            var pattern = argv["_"][1].split('/');
+            if (pattern.length > 1) {
+                nodes = getMatchingNodes(nodes, "node=="+pattern[0]);
+            }
+            // see if there is any classic constraints
+            var constraints = parseEnv(argv);
+            for (var i = constraints.length - 1; i >= 0; i--) {
+                nodes = getMatchingNodes(nodes, constraints[i])
+            };
+            // if there is a glob, get container list from each node and find matching containers to name
+            // it never makes sense to match to cid because these should be unique among nodes
+            // if there is an expand, just send the list to every node(!)
+            if (pattern[1].includes("*")) {
+                // glob
+            } else {
+                // expand
+                var namestoremove = expand(pattern[1]);
+                for (var i = nodes.length - 1; i >= 0; i--) {
+                    var node = nodes[i];
+                    (function (node) {
+                        var cmdline = 'docker rm ';
+                        cmdline += namestoremove.join(' ');
+                        var opts = {
+                            env: {
+                                'DOCKER_HOST': config.nodes[node].ip+':'+config.nodes[node].port
+                            }
+                        };
+                        var child = child_process.exec(cmdline, opts, function (err, stdout, stderr) {
+                            if (!err) {
+                                // expect just container id
+                                console.log(node, ":", stdout.trim());
+                            } else {
+                                // should show error
+                                console.error(node, ":", stderr);
+                            }
+                        });
+                    })(node);
+                };
+            }
+        })
     .command('pull', 'Pull an image or a repository from a registry')
     .command('rmi', 'Remove one or more images')
     .command('ps', 'List containers')
