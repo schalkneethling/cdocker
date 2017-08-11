@@ -353,8 +353,15 @@ var argv = require('yargs')
                 process.exit(1);
             } else {
                 // use round robin strategy with the available nodes
-                console.log("Using round robin strategy with ", nodes.length, "nodes");
-                
+                console.log("Using round robin strategy with", nodes.length, "nodes");
+                var count = 0;
+                for (var i = containers.length; i--; ) {
+                    if (count >= nodes.length) {
+                        count = 0;
+                    }
+                    containers[i].node = nodes[count];
+                    count++;
+                }
             }
         }
         else if (nodes.length == containers.length) {
