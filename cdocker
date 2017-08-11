@@ -57,11 +57,26 @@ var getNodeInfo = function (node) {
     return promise.promise;
 }
 
-var getBestOrderNodes = function () {
+var testConstraint = function (node, constraint) {
+    // parse a string like 
+    // node==node{1..10}
+    // node==node*
+    // node==exactnode
+    // and return true or false given a node name
+    var matched = false;
+    if (constraint.includes("==")) {
+
+    } else {
+        console.error("This constraint is not supported yet:", constraint);
+        process.exit(1);
+    }
+    //console.log("check constraint", node);
+    return matched;
+}
+
+var getMatchingNodes = function (constraints) {
     var promise = deferred();
-    // This function will be called when 'any' node is requested
-    // It simply sorts the nodes by number of running containers and takes the lowest
-    // Where many nodes are joint-lowest, we pick a random one
+    // get info from all nodes
     deferred.map(Object.keys(config.nodes), getNodeInfo)(function (result) {
         var running = {};
         for (var i = result.length; i--; ) {
@@ -79,7 +94,20 @@ var getBestOrderNodes = function () {
                 sortednodes.push(running[sortedkeys[i]][j]);
             }
         }
-        promise.resolve(sortednodes);
+        // test each node against constraints and remove from list if not matched
+        var matchednodes = [];
+        for (var i = sortednodes.length; i--; ) {
+            var matched = true;
+            for (var j = constraints.length; j--; ) {
+                if (!testConstraint(sortednodes[i], constraints[j])) {
+                    matched = false;
+                }
+            };
+            if(matched) {
+                matchednodes.push(sortednodes[i]);
+            }
+        }
+        promise.resolve(matchednodes);
     });
     return promise.promise;
 }
@@ -163,6 +191,7 @@ var argv = require('yargs')
         }
         var names = expand(argv.name);
         var containers = [];
+        var constraints = [];
         for (var i = names.length; i--; ) {
             containers.push({
                 name: names[i],
@@ -170,50 +199,30 @@ var argv = require('yargs')
             });
         }
         // make sure we alway have array for env vars
-        if (!(argv.e instanceof Array)) {
-            argv.e = [argv.e];
-        }
-        // look for and expand constraints
-        for (var i = argv.e.length; i--; ) {
-            var keysplit = argv.e[i].split(":");
-            if (keysplit[0] == 'constraint') {
-                if (keysplit[1].includes("==")) {
-                    var valuesplit = keysplit[1].split("==");
-                    var constraint = valuesplit[0];
-                    var pattern = expand(valuesplit[1]);
-                    var count = 0;
-                    if (containers.length != pattern.length) {
-                        if (overprovision) {
-                            for (var j = containers.length; j--; ) {
-                                containers[j][constraint] = pattern[count];
-                                if (count == pattern.length) {
-                                    count = 0;
-                                } else {
-                                    count++;
-                                }
-                            }
-                        } else {
-                            console.error("The expansion for constraint [", keysplit[1], 
-                                '] length', pattern.length, 
-                                'does not match container array length', 
-                                containers.length, 
-                                'and over provisioning is disabled.');
-                            process.exit(1);
-                        }
-                    }
-                    
-                } else {
-                    console.error("This constraint is not supported yet:", argv.e[i]);
-                    process.exit(1);
+        if (argv.e) {
+            if (!(argv.e instanceof Array)) {
+                argv.e = [argv.e];
+            }
+            // look for constraints
+            for (var i = argv.e.length; i--; ) {
+                var keysplit = argv.e[i].split(":");
+                if (keysplit[0] == 'constraint') {
+                    constraints.push(keysplit[1]);
                 }
             }
         }
-        // if 'any' node is specified, we must select some nodes and possibly re use some
-        getBestOrderNodes().then(function (nodes) {
-            var needed_nodes = 0;
-            for (var i = containers.length; i--; ) {
-                containers[i];
+        console.log(constraints);
+        console.log(containers);
+        getMatchingNodes(constraints).then(function (nodes) {
+            if (nodes.length != containers.length) {
+                if (!overprovision) {
+                    console.error("Not enough nodes matched (", nodes.length,
+                    ") for the specified container array (", containers.length,
+                    ") and overprovision is not enabled.");
+                    process.exit(1);
+                }
             }
+            console.log(nodes);
         });
         /*for (var i = containers.length; i--; ) {
             var cmdline = process.argv.slice(2).join(" ");
