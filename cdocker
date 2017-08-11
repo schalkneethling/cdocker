@@ -98,7 +98,7 @@ var getMatchingContainers = function (node, constraint) {
                 }
             }
             if (matched) {
-                matchedcontainers.push(containers[i].Id);
+                matchedcontainers.push(containers[i].Id); // containers[i].Id or name?
             }
         };
         promise.resolve([node, matchedcontainers]);
@@ -195,13 +195,22 @@ var callContainerFunction = function (argv, func) {
                     var promise = deferred();
                     var funccb = function (err, data) {
                         if (err) {
-                            promise.resolve(err.message);
+                            promise.resolve(err.message+cid);
                         } else {
                             promise.resolve(cid);
                         }
                     };
                     if (func == 'rm') {
                         dockerclient.getContainer(cid).remove(funccb);
+                    }
+                    else if (func == 'kill') {
+                        dockerclient.getContainer(cid).kill(funccb);
+                    }
+                    else if (func == 'start') {
+                        dockerclient.getContainer(cid).start(funccb);
+                    }
+                    else if (func == 'stop') {
+                        dockerclient.getContainer(cid).stop(funccb);
                     }
                     return promise.promise;
                 })(function (rmresult) {
@@ -356,9 +365,24 @@ var argv = require('yargs')
             })(container);
         };
     })
-    .command('start', 'Start one or more stopped containers')
-    .command('stop', 'Stop one or more running containers')
-    .command('kill', 'Kill one or more running containers')
+    .command('start', 'Start one or more stopped containers', function (yargs) {
+            return yargs
+                .usage('cdocker start <node pattern>/<name pattern>');
+        }, function (argv) {
+            callContainerFunction(argv, 'start');
+        })
+    .command('stop', 'Stop one or more running containers', function (yargs) {
+            return yargs
+                .usage('cdocker stop <node pattern>/<name pattern>');
+        }, function (argv) {
+            callContainerFunction(argv, 'stop');
+        })
+    .command('kill', 'Kill one or more running containers', function (yargs) {
+            return yargs
+                .usage('cdocker kill <node pattern>/<name pattern>');
+        }, function (argv) {
+            callContainerFunction(argv, 'kill');
+        })
     .command('rm', 'Remove one or more containers', function (yargs) {
             return yargs
                 .usage('cdocker rm <node pattern>/<name pattern>');
