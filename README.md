@@ -91,4 +91,4 @@ You can specify the strategy in the `run` command as an environment variable, ju
 -e strategy:unique-random
 ```
 
-If you don't specify a strategy, `least-running` will be used by default. However, this requires enumeration of all nodes which may not be performant with very large clusters.
+If you don't specify a strategy, `least-running` will be used by default. However, this requires enumeration of all matched nodes which may degrade performance on very large clusters. 
