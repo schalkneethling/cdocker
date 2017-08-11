@@ -98,7 +98,7 @@ var getMatchingContainers = function (node, constraint) {
                 }
             }
             if (matched) {
-                matchedcontainers.push(name);
+                matchedcontainers.push(containers[i].Id);
             }
         };
         promise.resolve([node, matchedcontainers]);
@@ -334,7 +334,26 @@ var argv = require('yargs')
             deferred.map(nodes, function (node) {
                 return getMatchingContainers(node, cpattern);
             })(function (result) {
-                console.log(result);
+                for (var i = result.length - 1; i >= 0; i--) {
+                    var node = result[i][0];
+                    var dockerclient = new Docker({host: config.nodes[node].ip, port: config.nodes[node].port});
+                    // dispatch the removes in parallel on each node
+                    deferred.map(result[i][1], function (cid) {
+                        var promise = deferred();
+                        dockerclient.getContainer(cid).remove(function (err, data) {
+                            if (err) {
+                                promise.resolve(err.message);
+                            } else {
+                                promise.resolve(cid);
+                            }
+                        });
+                        return promise.promise;
+                    })(function (rmresult) {
+                        for (var i = rmresult.length - 1; i >= 0; i--) {
+                            console.log(node, ':', rmresult[i]);
+                        };
+                    });
+                };
             });
         })
     .command('pull', 'Pull an image or a repository from a registry')
