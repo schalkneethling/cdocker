@@ -12,10 +12,22 @@ var minimatch = require('minimatch');
 var expand = require('brace-expansion');
 var randomItem = require('random-item');
 var child_process = require('child_process');
+var yesNo = require('yes-no');
+yesNo.userTests.push(function(value) {
+    // Test functions should return a boolean for recognized 
+    // values, or anything else (or nothing) for unrecognized. 
+    if (value === 'on') {
+        return true;
+    }
+    if (value === 'off') {
+        return false;
+    }
+});
 
 var config = {
     containers: {},
-    nodes: {}
+    nodes: {},
+    overprovision: false
 };
 var configfile = path.join(os.homedir(), '.cdocker.json');
 
@@ -260,6 +272,18 @@ var argv = require('yargs')
                 });
             })
             .command('remove [ip]', 'Remove a node from the cluster')
+            .command('overprovision [state]', 'Enable or disable over provisioning on this cluster', function () {}, function (argv) {
+                if (!argv.state) {
+                    if (config.overprovision) {
+                        console.log('Cluster over provisioning is ON');
+                    } else {
+                        console.log('Cluster over provisioning is OFF');
+                    }
+                } else {
+                    config.overprovision = yesNo.parse(argv.state);
+                    saveConfig();
+                }
+            })
             .command('ls', 'List nodes', function () {}, function (argv) {
                 deferred.map(Object.keys(config.nodes), getNodeInfo)(function (result) {
                     // build a fancy table
@@ -296,7 +320,6 @@ var argv = require('yargs')
         ;
     })
     .command('run', 'Run a command in a new container', function () {}, function (argv) {
-        var overprovision = false;
         // expand container names
         if(!argv.name) {
             console.error("Please specify a container name (or array using brace expansion)");
@@ -323,11 +346,15 @@ var argv = require('yargs')
             process.exit(1);
         }
         else if (nodes.length < containers.length) {
-            if (!overprovision) {
+            if (!config.overprovision) {
                 console.error("Not enough nodes matched (", nodes.length,
                 ") for the specified container array (", containers.length,
                 ") and overprovision is not enabled.");
                 process.exit(1);
+            } else {
+                // use round robin strategy with the available nodes
+                console.log("Using round robin strategy with ", nodes.length, "nodes");
+                
             }
         }
         else if (nodes.length == containers.length) {
