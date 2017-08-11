@@ -98,7 +98,7 @@ var getMatchingContainers = function (node, constraint) {
                 }
             }
             if (matched) {
-                matchedcontainers.push(containers[i].Id); // containers[i].Id or name?
+                matchedcontainers.push(name); // containers[i].Id or name?
             }
         };
         promise.resolve([node, matchedcontainers]);
