@@ -11,6 +11,7 @@ var Table = require('cli-table2');
 var minimatch = require('minimatch');
 var expand = require('brace-expansion');
 var randomItem = require('random-item');
+var child_process = require('child_process');
 
 var config = {
     containers: {},
@@ -250,9 +251,26 @@ var argv = require('yargs')
         }
         // generate the docker commands
         for (var i = containers.length - 1; i >= 0; i--) {
-            var cmdline = 'DOCKER_HOST='+config.nodes[containers[i].node].ip+ ':'+config.nodes[containers[i].node].port+' docker ';
-            cmdline += process.argv.slice(2).join(' ').replace(argv.name, containers[i].name);
-            console.log(cmdline);
+            var container = containers[i];
+            (function (container) {
+                var cmdline = 'docker ';
+                cmdline += process.argv.slice(2).join(' ').replace(argv.name, container.name);
+                // run in child process
+                var opts = {
+                    env: {
+                        'DOCKER_HOST': config.nodes[container.node].ip+':'+config.nodes[container.node].port
+                    }
+                };
+                var child = child_process.exec(cmdline, opts, function (err, stdout, stderr) {
+                    if (!err) {
+                        // expect just container id
+                        console.log(container.node, ":", stdout.trim());
+                    } else {
+                        // should show error
+                        console.error(container.node, ":", stderr);
+                    }
+                });
+            })(container);
         };
     })
     .command('start', 'Start one or more stopped containers')
