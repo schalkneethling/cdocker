@@ -18,5 +18,8 @@
     "random-item": "^1.0.0",
     "yargs": "^8.0.2",
     "yes-no": "0.0.1"
+  },
+  "bin": {
+    "cdocker": "cdocker"
   }
 }
