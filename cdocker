@@ -12,10 +12,22 @@ var minimatch = require('minimatch');
 var expand = require('brace-expansion');
 var randomItem = require('random-item');
 var child_process = require('child_process');
+var yesNo = require('yes-no');
+yesNo.userTests.push(function(value) {
+    // Test functions should return a boolean for recognized 
+    // values, or anything else (or nothing) for unrecognized. 
+    if (value === 'on') {
+        return true;
+    }
+    if (value === 'off') {
+        return false;
+    }
+});
 
 var config = {
     containers: {},
-    nodes: {}
+    nodes: {},
+    overprovision: false
 };
 var configfile = path.join(os.homedir(), '.cdocker.json');
 
@@ -167,6 +179,53 @@ var getMatchingNodes = function (nodenames, constraint) {
     return matchednodes;
 };
 
+var orderNodesByRunning = function (nodes) {
+    var promise = deferred();
+    deferred.map(nodes, function (node) {
+        var promise = deferred();
+        new Docker({host: config.nodes[node].ip, port: config.nodes[node].port}).info(function (err, data) {
+            promise.resolve([node, Math.floor(Math.random() * 20)]); // Math.floor(Math.random() * 20)
+        });
+        return promise.promise;
+    })(function (result) {
+        var sorted = result.sort(function(a, b) {
+            return a[1] - b[1];
+        });
+        var orderednodes = [];
+        for (var i = sorted.length; i--; ) {
+            orderednodes.push(sorted[i][0]);
+        }
+        promise.resolve(orderednodes.reverse());
+    });
+    return promise.promise;
+};
+
+var runContainers = function (argv, containers) {
+    // generate the docker commands
+    for (var i = containers.length - 1; i >= 0; i--) {
+        var container = containers[i];
+        (function (container) {
+            var cmdline = 'docker ';
+            cmdline += process.argv.slice(2).join(' ').replace(argv.name, container.name);
+            // run in child process
+            var opts = {
+                env: {
+                    'DOCKER_HOST': config.nodes[container.node].ip+':'+config.nodes[container.node].port
+                }
+            };
+            child_process.exec(cmdline, opts, function (err, stdout, stderr) {
+                if (!err) {
+                    // expect just container id
+                    console.log(container.node, ":", stdout.trim());
+                } else {
+                    // should show error
+                    console.error(container.node, ":", stderr);
+                }
+            });
+        })(container);
+    }
+};
+
 var callContainerFunction = function (argv, func) {
     var nodes = Object.keys(config.nodes);
     // see if there is a node constraint
@@ -180,8 +239,8 @@ var callContainerFunction = function (argv, func) {
     // see if there is any classic constraints
     var constraints = parseEnv(argv);
     for (var i = constraints.length - 1; i >= 0; i--) {
-        nodes = getMatchingNodes(nodes, constraints[i])
-    };
+        nodes = getMatchingNodes(nodes, constraints[i]);
+    }
     // do each node in parallel
     deferred.map(nodes, function (node) {
         return getMatchingContainers(node, cpattern);
@@ -260,8 +319,31 @@ var argv = require('yargs')
                 });
             })
             .command('remove [ip]', 'Remove a node from the cluster')
-            .command('ls', 'List nodes', function () {}, function (argv) {
-                deferred.map(Object.keys(config.nodes), getNodeInfo)(function (result) {
+            .command('overprovision [state]', 'Enable or disable over provisioning on this cluster', function () {}, function (argv) {
+                if (!argv.state) {
+                    if (config.overprovision) {
+                        console.log('Cluster over provisioning is ON');
+                    } else {
+                        console.log('Cluster over provisioning is OFF');
+                    }
+                } else {
+                    config.overprovision = yesNo.parse(argv.state);
+                    saveConfig();
+                }
+            })
+            .command('ls [pattern]', 'List nodes (optional: specify node constraint pattern)', function () {}, function (argv) {
+                var nodes = Object.keys(config.nodes);
+                // node constraint
+                if (argv.pattern) {
+                    nodes = getMatchingNodes(Object.keys(config.nodes), 'node=='+argv.pattern);
+                }
+                // classic swarm constraint
+                var constraints = parseEnv(argv);
+                for (var i = constraints.length - 1; i >= 0; i--) {
+                    nodes = getMatchingNodes(nodes, constraints[i]);
+                }
+                // enumerate the node info
+                deferred.map(nodes, getNodeInfo)(function (result) {
                     // build a fancy table
                     var table = new Table({
                         head: ['IP', '', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped', 'Labels'],
@@ -296,12 +378,12 @@ var argv = require('yargs')
         ;
     })
     .command('run', 'Run a command in a new container', function () {}, function (argv) {
-        var overprovision = false;
         // expand container names
         if(!argv.name) {
             console.error("Please specify a container name (or array using brace expansion)");
             process.exit(1);
         }
+        var strategy = 'least-running';
         var names = expand(argv.name);
         var containers = [];
         for (var i = names.length; i--; ) {
@@ -315,55 +397,55 @@ var argv = require('yargs')
         // run each constraint sequentially to whittle down the nodes
         var nodes = Object.keys(config.nodes);
         for (var i = constraints.length - 1; i >= 0; i--) {
-            nodes = getMatchingNodes(nodes, constraints[i])
-        };
+            nodes = getMatchingNodes(nodes, constraints[i]);
+        }
         // see what we got
         if (nodes.length == 0) {
-            console.error("No nodes matched the constraints specified.")
+            console.error("No nodes matched the constraints specified.");
             process.exit(1);
         }
         else if (nodes.length < containers.length) {
-            if (!overprovision) {
+            if (!config.overprovision) {
                 console.error("Not enough nodes matched (", nodes.length,
                 ") for the specified container array (", containers.length,
                 ") and overprovision is not enabled.");
                 process.exit(1);
+            } else {
+                // use round robin strategy with the available nodes
+                console.log("Using round robin strategy with", nodes.length, "nodes");
+                var count = 0;
+                for (var i = containers.length; i--; ) {
+                    if (count >= nodes.length) {
+                        count = 0;
+                    }
+                    containers[i].node = nodes[count];
+                    count++;
+                }
+                runContainers(argv, containers);
             }
         }
         else if (nodes.length == containers.length) {
             // exact match then run them straight
             for (var i = containers.length - 1; i >= 0; i--) {
                 containers[i].node = nodes[i];
-            };
+            }
+            runContainers(argv, containers);
         }
         else {
             // too many nodes matched!
-            console.error("Too many nodes matched (", nodes.length, ") for the specified container array (", containers.length, ").");
-            process.exit(1);
-        }
-        // generate the docker commands
-        for (var i = containers.length - 1; i >= 0; i--) {
-            var container = containers[i];
-            (function (container) {
-                var cmdline = 'docker ';
-                cmdline += process.argv.slice(2).join(' ').replace(argv.name, container.name);
-                // run in child process
-                var opts = {
-                    env: {
-                        'DOCKER_HOST': config.nodes[container.node].ip+':'+config.nodes[container.node].port
+            if (strategy == 'least-running') {
+                orderNodesByRunning(nodes).then(function (orderednodes) {
+                    for (var i = containers.length - 1; i >= 0; i--) {
+                        containers[i].node = orderednodes[i];
                     }
-                };
-                var child = child_process.exec(cmdline, opts, function (err, stdout, stderr) {
-                    if (!err) {
-                        // expect just container id
-                        console.log(container.node, ":", stdout.trim());
-                    } else {
-                        // should show error
-                        console.error(container.node, ":", stderr);
-                    }
+                    runContainers(argv, containers);
                 });
-            })(container);
-        };
+            }
+            else {
+                console.error("Too many nodes matched and no scheduling strategy defined.");
+                process.exit(1);
+            }
+        }
     })
     .command('start', 'Start one or more stopped containers', function (yargs) {
             return yargs
