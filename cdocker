@@ -351,8 +351,23 @@ var argv = require('yargs')
                             head: []
                         }
                     });
+                    var totals = {
+                        up: 0,
+                        down: 0,
+                        cpus: 0,
+                        mem: 0,
+                        running: 0,
+                        stopped: 0
+                    };
                     for (var i = 0; i < result.length; i++) {
                         if (result[i].status == 'up') {
+                            // update totals
+                            totals.up += 1;
+                            totals.cpus += result[i].NCPU;
+                            totals.mem += result[i].MemTotal;
+                            totals.running += result[i].ContainersRunning;
+                            totals.stopped += result[i].ContainersStopped;
+                            // add to table
                             table.push([
                                 result[i].ip,
                                 result[i].status,
@@ -365,12 +380,28 @@ var argv = require('yargs')
                                 JSON.stringify(result[i].Labels)
                             ]);
                         } else {
+                            // node is down
+                            totals.down += 1;
                             table.push([
                                 result[i].ip,
                                 result[i].status
                             ]);
                         }
                     };
+                    // add totals to table
+                    table.push(['IP', '', 'Node', 'OS/Arch', 'CPUs', 'RAM', 'Running', 'Stopped', 'Labels']);
+                    table.push([
+                        'total: '+result.length,
+                        'up: '+totals.up,
+                        '',
+                        '',
+                        totals.cpus,
+                        pretty(totals.mem),
+                        totals.running,
+                        totals.stopped,
+                        ''
+                    ]);
+                    // draw table
                     console.log(table.toString());
                 });
             })
