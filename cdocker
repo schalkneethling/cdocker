@@ -247,7 +247,7 @@ var argv = require('yargs')
                             console.log("Added engine at", ip);
                             config.nodes[data.Name] = {
                                 port: argv.port,
-                                ip: argv.ip,
+                                ip: ip,
                                 labels: data.Labels
                             };
                             promise.resolve();
