@@ -54,12 +54,13 @@ loadConfig();
 
 var getNodeInfo = function (node) {
     var promise = deferred();
-    new Docker({host: config.nodes[node].ip, port: config.nodes[node].port}).info(function (err, data) {
+    new Docker({host: config.nodes[node].ip, port: config.nodes[node].port, timeout: 2000}).info(function (err, data) {
         if (err) {
             promise.resolve({
                 ip: config.nodes[node].ip,
                 status: 'down',
-                reason: err
+                reason: 'error',
+                node: node
             });
         } else {
             data.ip = config.nodes[node].ip;
@@ -384,7 +385,8 @@ var argv = require('yargs')
                             totals.down += 1;
                             table.push([
                                 result[i].ip,
-                                result[i].status
+                                result[i].status,
+                                result[i].node
                             ]);
                         }
                     };
