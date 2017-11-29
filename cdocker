@@ -31,6 +31,10 @@ var config = {
 };
 var configfile = path.join(os.homedir(), '.cdocker.json');
 
+var escapeRegExp = function (str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
+}
+
 var loadConfig = function () {
     try {
         var data = fs.readFileSync(configfile);
@@ -207,7 +211,9 @@ var runContainers = function (argv, containers) {
         var container = containers[i];
         (function (container) {
             var cmdline = 'docker ';
-            cmdline += process.argv.slice(2).join(' ').replace(argv.name, container.name);
+            cmdline += process.argv.slice(2).join(' ').replace(new RegExp(escapeRegExp(argv.name), 'g'), container.name);
+            console.log(argv.name);
+            console.log(cmdline);
             // run in child process
             var opts = {
                 env: {
