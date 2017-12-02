@@ -1,12 +1,12 @@
 {
   "name": "@clusterworks/cdocker",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.0.2",
+  "description": "Run commands across a cluster of Docker Engines",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Joshua Higgins <joshiggins@gmail.com> (http://joshh.info/)",
+  "author": "Joshua Higgins",
   "license": "MIT",
   "dependencies": {
     "brace-expansion": "^1.1.8",
@@ -14,6 +14,7 @@
     "deferred": "^0.7.8",
     "dockerode": "^2.5.0",
     "minimatch": "^3.0.4",
+    "parse-numeric-range": "0.0.2",
     "prettysize": "^0.1.0",
     "random-item": "^1.0.0",
     "yargs": "^8.0.2",
