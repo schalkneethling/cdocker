@@ -99,25 +99,27 @@ var getMatchingContainers = function (node, constraint) {
     dockerclient.listContainers({all: true}, function (err, containers) {
         // for each container
         var matchedcontainers = [];
-        for (var i = containers.length - 1; i >= 0; i--) {
-            var name = containers[i].Names[0].substring(1);
-            var matched = true;
-            if (constraint.includes("*")) {
-                // glob
-                if (!minimatch(name, constraint)) {
-                    matched = false;
+        if (containers) {
+            for (var i = containers.length - 1; i >= 0; i--) {
+                var name = containers[i].Names[0].substring(1);
+                var matched = true;
+                if (constraint.includes("*")) {
+                    // glob
+                    if (!minimatch(name, constraint)) {
+                        matched = false;
+                    }
+                } else {
+                    // expand
+                    var match_names = expand(constraint);
+                    if (!match_names.includes(name)) {
+                        matched = false;
+                    }
                 }
-            } else {
-                // expand
-                var match_names = expand(constraint);
-                if (!match_names.includes(name)) {
-                    matched = false;
+                if (matched) {
+                    matchedcontainers.push(name); // containers[i].Id or name?
                 }
-            }
-            if (matched) {
-                matchedcontainers.push(name); // containers[i].Id or name?
-            }
-        };
+            };
+        }
         promise.resolve([node, matchedcontainers]);
     });
     return promise.promise;
