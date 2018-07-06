@@ -7,15 +7,15 @@ var Docker = require('dockerode');
 var pretty = require('prettysize');
 var rangeParser = require('parse-numeric-range');
 var deferred = require('deferred');
-var Table = require('cli-table2');
+var Table = require('cli-table3');
 var minimatch = require('minimatch');
 var expand = require('brace-expansion');
 var randomItem = require('random-item');
 var child_process = require('child_process');
 var yesNo = require('yes-no');
 yesNo.userTests.push(function(value) {
-    // Test functions should return a boolean for recognized 
-    // values, or anything else (or nothing) for unrecognized. 
+    // Test functions should return a boolean for recognized
+    // values, or anything else (or nothing) for unrecognized.
     if (value === 'on') {
         return true;
     }
